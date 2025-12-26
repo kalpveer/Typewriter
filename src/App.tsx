@@ -333,7 +333,7 @@ function App() {
 
         const timestamp = new Date();
         // Default to first line as title or generic
-        const preview = text.split('\n')[0].substring(0, 30);
+
 
         const newEntry: Entry = {
             id: currentEntryId || crypto.randomUUID(),
