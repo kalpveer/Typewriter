@@ -22,15 +22,17 @@ interface Entry {
 
 function App() {
     // --- Music Player State ---
+    const [showMusicPlayer, setShowMusicPlayer] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState(0);
     const [volume, setVolume] = useState(0.5);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // Using reliable direct MP3 links to simulate the desired "Chill Electronic" vibe
     const PLAYLIST = [
-        { title: "Vintage Jazz", src: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=salty-swing-11354.mp3" },
-        { title: "Lofi Study", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" },
-        { title: "Midnight Noir", src: "https://cdn.pixabay.com/download/audio/2022/02/22/audio_d1718ab41b.mp3?filename=rainy-day-110825.mp3" }
+        { title: "Chill Lofi Study", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" },
+        { title: "Night Rain", src: "https://cdn.pixabay.com/download/audio/2022/02/22/audio_d1718ab41b.mp3?filename=rainy-day-110825.mp3" },
+        { title: "Deep Urban", src: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=salty-swing-11354.mp3" } // Re-using Jazz as 'Deep Urban' placeholder for now or finding better if possible, but keeping it simple to ensure playback works.
     ];
 
     useEffect(() => {
@@ -41,8 +43,7 @@ function App() {
             if (audioRef.current.src !== PLAYLIST[currentTrack].src) {
                 audioRef.current.src = PLAYLIST[currentTrack].src;
                 if (isPlaying) {
-                    // Using catch to prevent unhandled promise rejection if user hasn't interacted
-                    audioRef.current.play().catch(e => console.log("Playback failed (autoplay policy?)", e));
+                    audioRef.current.play().catch(e => console.log("Playback failed", e));
                 }
             }
         }
@@ -66,6 +67,19 @@ function App() {
     const togglePlay = () => setIsPlaying(!isPlaying);
     const nextTrack = () => setCurrentTrack((prev) => (prev + 1) % PLAYLIST.length);
     const prevTrack = () => setCurrentTrack((prev) => (prev - 1 + PLAYLIST.length) % PLAYLIST.length);
+    // ---------------------------
+
+    // --- Global Shortcuts ---
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Alt + M to reopen Music Player
+            if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+                setShowMusicPlayer(true);
+            }
+        };
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
     // ---------------------------
 
     // --- Draggable Widget Logic ---
@@ -577,40 +591,51 @@ function App() {
                     </g>
                 </svg>
                 {/* Music Player Widget */}
-                <div
-                    className="music-player"
-                    style={{
-                        transform: `translate(${widgetPos.x}px, ${widgetPos.y}px)`,
-                        cursor: isDragging ? 'grabbing' : 'grab'
-                    }}
-                    onMouseDown={startDrag}
-                >
-                    <div className="album-art">
-                        <div className={`vinyl ${isPlaying ? 'playing' : ''}`}></div>
-                    </div>
-                    <div className="track-info">
-                        <strong>{PLAYLIST[currentTrack].title}</strong>
-                    </div>
-                    <div className="controls" onMouseDown={(e) => e.stopPropagation()}>
-                        <button className="control-btn" onClick={prevTrack}><SkipBack size={18} /></button>
-                        <button className="control-btn" onClick={togglePlay}>
-                            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                {showMusicPlayer && (
+                    <div
+                        className="music-player"
+                        style={{
+                            transform: `translate(${widgetPos.x}px, ${widgetPos.y}px)`,
+                            cursor: isDragging ? 'grabbing' : 'grab'
+                        }}
+                        onMouseDown={startDrag}
+                    >
+                        <button
+                            className="close-widget-btn"
+                            onClick={() => setShowMusicPlayer(false)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            title="Close (Alt+M to reopen)"
+                        >
+                            <X size={14} />
                         </button>
-                        <button className="control-btn" onClick={nextTrack}><SkipForward size={18} /></button>
+
+                        <div className="album-art">
+                            <div className={`vinyl ${isPlaying ? 'playing' : ''}`}></div>
+                        </div>
+                        <div className="track-info">
+                            <strong>{PLAYLIST[currentTrack].title}</strong>
+                        </div>
+                        <div className="controls" onMouseDown={(e) => e.stopPropagation()}>
+                            <button className="control-btn" onClick={prevTrack}><SkipBack size={18} /></button>
+                            <button className="control-btn" onClick={togglePlay}>
+                                {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                            </button>
+                            <button className="control-btn" onClick={nextTrack}><SkipForward size={18} /></button>
+                        </div>
+                        <div className="volume-slider-container" onMouseDown={(e) => e.stopPropagation()}>
+                            <Volume2 size={14} color="#888" />
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={volume}
+                                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                className="volume-slider"
+                            />
+                        </div>
                     </div>
-                    <div className="volume-slider-container" onMouseDown={(e) => e.stopPropagation()}>
-                        <Volume2 size={14} color="#888" />
-                        <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={volume}
-                            onChange={(e) => setVolume(parseFloat(e.target.value))}
-                            className="volume-slider"
-                        />
-                    </div>
-                </div>
+                )}
 
             </div>
         </div>
