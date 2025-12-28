@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward, Settings, Monitor, Coffee, Zap, Info, Sun, Moon, CloudRain, Flame } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import './index.css';
 import './music_player.css';
+import './widgets.css';
 
 // Sound Engine Types
 type SoundType = 'key' | 'space' | 'enter' | 'paper';
@@ -23,6 +24,7 @@ interface Entry {
 function App() {
     // --- Music Player State ---
     const [showMusicPlayer, setShowMusicPlayer] = useState(true);
+    const [screenshotMenuOpen, setScreenshotMenuOpen] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState(0);
     const [volume, setVolume] = useState(0.5);
@@ -131,6 +133,43 @@ function App() {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
     const [showEntries, setShowEntries] = useState(false);
+
+    // --- New Features State ---
+    // 1. Lighting Theme
+    const [theme, setTheme] = useState<'normal' | 'warm' | 'dim'>('normal');
+
+    // 2. Ambience
+    const [ambienceDrawerOpen, setAmbienceDrawerOpen] = useState(false);
+    const [ambienceLevels, setAmbienceLevels] = useState({ rain: 0, fire: 0, cafe: 0 });
+    const ambienceRefs = {
+        rain: useRef<HTMLAudioElement | null>(null),
+        fire: useRef<HTMLAudioElement | null>(null),
+        cafe: useRef<HTMLAudioElement | null>(null)
+    };
+
+    // 3. Pomodoro
+    const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
+    const [pomodoroActive, setPomodoroActive] = useState(false);
+
+    // 4. Stats
+    const [wordCount, setWordCount] = useState(0);
+
+    // 5. Inspiration
+    const [cardFlipped, setCardFlipped] = useState(false);
+    const [currentQuote, setCurrentQuote] = useState({ text: "Write drunk, edit sober.", author: "Hemingway" });
+
+    // 6. Settings (Paper/Font)
+    const [settingOpen, setSettingOpen] = useState(false);
+    const [paperStyle, setPaperStyle] = useState('plain'); // plain, lined, grid
+    const [fontStyle, setFontStyle] = useState('Special Elite'); // Special Elite, Courier Prime
+
+    const QUOTES = [
+        { text: "There is nothing to writing. All you do is sit down at a typewriter and bleed.", author: "Hemingway" },
+        { text: "Detailed outlining is the enemy of spontaneity.", author: "Stephen King" },
+        { text: "Start writing, no matter what. The water does not flow until the faucet is turned on.", author: "Louis L'Amour" },
+        { text: "You can make anything by writing.", author: "C.S. Lewis" },
+        { text: "Don't tell me the moon is shining; show me the glint of light on broken glass.", author: "Chekhov" }
+    ];
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mirrorRef = useRef<HTMLDivElement>(null);
@@ -245,11 +284,54 @@ function App() {
         }
     }, []);
 
-    // Save Text to LocalStorage Draft
+    // Save Text to LocalStorage Draft & Update Word Count
     useEffect(() => {
         localStorage.setItem('diary_content', text);
+        setWordCount(text.trim().split(/\s+/).filter(w => w.length > 0).length);
         updateCaretPosition();
     }, [text]);
+
+    // Pomodoro Timer Logic
+    useEffect(() => {
+        let interval: any = null;
+        if (pomodoroActive && pomodoroTime > 0) {
+            interval = setInterval(() => {
+                setPomodoroTime((prev) => prev - 1);
+            }, 1000);
+        } else if (pomodoroTime === 0 && pomodoroActive) {
+            setPomodoroActive(false);
+            // Bell sound could go here
+            if (audioCtx) playSound('enter'); // Use Enter sound as convenient bell
+        }
+        return () => clearInterval(interval);
+    }, [pomodoroActive, pomodoroTime]);
+
+    // Ambience Logic
+    const toggleAmbience = (type: 'rain' | 'fire' | 'cafe', vol: number) => {
+        setAmbienceLevels(prev => ({ ...prev, [type]: vol }));
+        const ref = ambienceRefs[type].current;
+        if (ref) {
+            ref.volume = vol;
+            if (vol > 0 && ref.paused) ref.play().catch(e => console.log(e));
+            if (vol === 0) ref.pause();
+        }
+    };
+
+    // Initialize Ambience Refs on mount
+    useEffect(() => {
+        if (!ambienceRefs.rain.current) {
+            ambienceRefs.rain.current = new Audio("https://cdn.pixabay.com/download/audio/2022/07/04/audio_3d168527f3.mp3");
+            ambienceRefs.rain.current.loop = true;
+        }
+        if (!ambienceRefs.fire.current) {
+            ambienceRefs.fire.current = new Audio("https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3");
+            ambienceRefs.fire.current.loop = true;
+        }
+        if (!ambienceRefs.cafe.current) {
+            ambienceRefs.cafe.current = new Audio("https://cdn.pixabay.com/download/audio/2021/08/09/audio_8ed465b53d.mp3"); // Cafe chatter
+            ambienceRefs.cafe.current.loop = true;
+        }
+    }, []);
 
     const playSound = (type: SoundType) => {
         if (!soundEnabled || !audioCtx) return;
@@ -412,29 +494,59 @@ function App() {
     };
 
     // Implemented Screenshot using html2canvas
-    const handleScreenshot = async () => {
+    // Implemented Screenshot using html2canvas
+    const handleScreenshot = async (mode: 'desk' | 'paper') => {
+        setScreenshotMenuOpen(false);
+
         // Temporary hide controls and caret for clean shot
         const controls = document.querySelector('.controls') as HTMLElement;
         const caret = document.querySelector('.custom-caret') as HTMLElement;
+        const mirror = mirrorRef.current;
+        const textarea = textareaRef.current;
 
         if (controls) controls.style.display = 'none';
         if (caret) caret.style.display = 'none';
 
+        // Swap textarea with mirror-div for better rendering
+        if (mirror && textarea) {
+            mirror.style.visibility = 'visible';
+            mirror.style.color = '#2b2b2b'; // Ensure ink color
+            textarea.style.opacity = '0';
+        }
+
         try {
             const element = document.querySelector('.container') as HTMLElement; // Capture full container (Desk + Paper)
             if (element) {
-                const canvas = await html2canvas(element, {
+                // Ensure starting from top
+                window.scrollTo(0, 0);
+
+                const options: any = {
                     scale: 2, // Retina quality
                     useCORS: true,
                     backgroundColor: null,
                     scrollX: 0,
-                    scrollY: 0,
-                    width: element.offsetWidth,
-                    height: element.offsetHeight
-                });
+                    scrollY: -window.scrollY,
+                    windowWidth: document.documentElement.offsetWidth,
+                    windowHeight: document.documentElement.offsetHeight
+                };
+
+                if (mode === 'paper') {
+                    const paperElement = document.querySelector('.paper-sheet');
+                    if (paperElement) {
+                        const rect = paperElement.getBoundingClientRect();
+                        // Crop to the paper width + typewriter area
+                        // We set X and Width to match the paper
+                        options.x = rect.left;
+                        options.y = 0;
+                        options.width = rect.width;
+                        options.height = window.innerHeight; // Full height to include typewriter
+                    }
+                }
+
+                const canvas = await html2canvas(element, options);
 
                 const link = document.createElement('a');
-                link.download = `typewriter_diary_${new Date().toISOString().slice(0, 10)}.png`;
+                link.download = `typewriter_diary_${mode}_${new Date().toISOString().slice(0, 10)}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             }
@@ -445,15 +557,119 @@ function App() {
             // Restore UI
             if (controls) controls.style.display = 'flex';
             if (caret) caret.style.display = 'block';
+            if (mirror && textarea) {
+                mirror.style.visibility = 'hidden';
+                textarea.style.opacity = '1';
+            }
         }
     };
 
     return (
-        <div className="container">
-            <div className="wood-texture" />
+        <div className="container" style={{ fontFamily: fontStyle === 'Special Elite' ? "'Special Elite', monospace" : "'Courier Prime', monospace" }}>
+            <div className={`wood-texture ${theme === 'warm' ? 'overlay-warm' : ''}`} />
+
+            {/* Lighting Overlay */}
+            {theme !== 'normal' && <div className={`lighting-layer light-${theme}`} />}
+
+            {/* Lamp Switch */}
+            <div className="lamp-switch" onClick={() => setTheme(prev => prev === 'normal' ? 'warm' : prev === 'warm' ? 'dim' : 'normal')} title="Toggle Light">
+                <div className="pull-chain" style={{ height: theme === 'normal' ? '40px' : '55px' }}>
+                    <div className="pull-knob"></div>
+                </div>
+            </div>
+
+            {/* Sticky Note (Word Count) */}
+            <div className="sticky-note">
+                <div className="sticky-pin"></div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Word Count</div>
+                <div style={{ fontSize: '2.5rem', marginTop: '10px' }}>{wordCount}</div>
+                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Goal: 500</div>
+            </div>
+
+            {/* Pomodoro Timer */}
+            <div className="pomodoro-widget" onClick={() => setPomodoroActive(!pomodoroActive)} title="Click to Start/Pause">
+                <div className="timer-face">
+                    {Math.floor(pomodoroTime / 60)}:{(pomodoroTime % 60).toString().padStart(2, '0')}
+                </div>
+                <div className="timer-progress" style={{ transform: `rotate(${((25 * 60 - pomodoroTime) / (25 * 60)) * 360}deg)` }}></div>
+                <div className="timer-label">{pomodoroActive ? "Running" : "Paused"}</div>
+            </div>
+
+            {/* Inspiration Deck */}
+            <div className={`inspiration-deck ${cardFlipped ? 'flipped' : ''}`} onClick={() => {
+                if (!cardFlipped) {
+                    const random = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+                    setCurrentQuote(random);
+                }
+                setCardFlipped(!cardFlipped);
+            }}>
+                <div className="card">
+                    <div className="card-front">
+                        <span>Need Inspiration?<br />Click to Flip</span>
+                    </div>
+                    <div className="card-back">
+                        <div style={{ padding: '5px' }}>
+                            <p>"{currentQuote.text}"</p>
+                            <div style={{ marginTop: '5px', fontStyle: 'italic' }}>- {currentQuote.author}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Ambience Control Drawer */}
+            <div className={`ambience-drawer ${ambienceDrawerOpen ? 'open' : ''}`}>
+                <div className="ambience-toggle" onClick={() => setAmbienceDrawerOpen(!ambienceDrawerOpen)}>
+                    <CloudRain size={20} />
+                </div>
+                <h3 style={{ marginBottom: '15px', color: '#fff' }}>Atmosphere</h3>
+
+                <div className="ambience-item">
+                    <CloudRain size={16} /> <span>Rain</span>
+                    <input type="range" min="0" max="1" step="0.1" value={ambienceLevels.rain} onChange={(e) => toggleAmbience('rain', parseFloat(e.target.value))} className="ambience-slider" />
+                </div>
+                <div className="ambience-item">
+                    <Flame size={16} /> <span>Fire</span>
+                    <input type="range" min="0" max="1" step="0.1" value={ambienceLevels.fire} onChange={(e) => toggleAmbience('fire', parseFloat(e.target.value))} className="ambience-slider" />
+                </div>
+                <div className="ambience-item">
+                    <Coffee size={16} /> <span>Cafe</span>
+                    <input type="range" min="0" max="1" step="0.1" value={ambienceLevels.cafe} onChange={(e) => toggleAmbience('cafe', parseFloat(e.target.value))} className="ambience-slider" />
+                </div>
+            </div>
+
+            {/* Settings Modal */}
+            <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 100 }}>
+                <button onClick={() => setSettingOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#554' }}>
+                    <Settings size={28} />
+                </button>
+            </div>
+
+            {settingOpen && (
+                <div className="settings-modal" onClick={() => setSettingOpen(false)}>
+                    <div className="settings-card" onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                            <h2>Typewriter Options</h2>
+                            <button onClick={() => setSettingOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X /></button>
+                        </div>
+
+                        <div className="settings-group">
+                            <h3>Paper Type</h3>
+                            <button className={`option-btn ${paperStyle === 'plain' ? 'active' : ''}`} onClick={() => setPaperStyle('plain')}>Plain</button>
+                            <button className={`option-btn ${paperStyle === 'lined' ? 'active' : ''}`} onClick={() => setPaperStyle('lined')}>Lined</button>
+                            <button className={`option-btn ${paperStyle === 'aged' ? 'active' : ''}`} onClick={() => setPaperStyle('aged')}>Aged</button>
+                        </div>
+
+                        <div className="settings-group">
+                            <h3>Font Style</h3>
+                            <button className={`option-btn ${fontStyle === 'Special Elite' ? 'active' : ''}`} onClick={() => setFontStyle('Special Elite')}>Inked Ribbon</button>
+                            <button className={`option-btn ${fontStyle === 'Courier Prime' ? 'active' : ''}`} onClick={() => setFontStyle('Courier Prime')}>Clean Digital</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="main-content">
-                <div className="paper-sheet">
+                <div className={`paper-sheet ${paperStyle}`}>
                     <div className="controls">
                         <button onClick={() => setSoundEnabled(!soundEnabled)} title={soundEnabled ? "Mute" : "Unmute"}>
                             {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
@@ -471,9 +687,61 @@ function App() {
                         <button onClick={handleDownload} title="Download">
                             <Download size={20} />
                         </button>
-                        <button onClick={handleScreenshot} title="Snapshot">
-                            <Camera size={20} />
-                        </button>
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <button onClick={() => setScreenshotMenuOpen(!screenshotMenuOpen)} title="Snapshot Options">
+                                <Camera size={20} />
+                            </button>
+                            {screenshotMenuOpen && (
+                                <div className="screenshot-menu" style={{
+                                    position: 'absolute',
+                                    top: '40px',
+                                    right: '0',
+                                    background: '#f7f4e9',
+                                    border: '1px solid #1a1512',
+                                    borderRadius: '4px',
+                                    padding: '5px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '5px',
+                                    minWidth: '120px',
+                                    zIndex: 100,
+                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                }}>
+                                    <button
+                                        onClick={() => handleScreenshot('desk')}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            textAlign: 'left',
+                                            padding: '8px',
+                                            cursor: 'pointer',
+                                            fontFamily: 'inherit',
+                                            color: '#2b2b2b'
+                                        }}
+                                        onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'rgba(0,0,0,0.05)'}
+                                        onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'none'}
+                                    >
+                                        Full Desk View
+                                    </button>
+                                    <button
+                                        onClick={() => handleScreenshot('paper')}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            textAlign: 'left',
+                                            padding: '8px',
+                                            cursor: 'pointer',
+                                            fontFamily: 'inherit',
+                                            color: '#2b2b2b'
+                                        }}
+                                        onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'rgba(0,0,0,0.05)'}
+                                        onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'none'}
+                                    >
+                                        Paper View
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="typing-container">
@@ -491,6 +759,7 @@ function App() {
                             onClick={handleClick}
                             autoFocus
                             placeholder=""
+                            style={{ fontFamily: fontStyle === 'Special Elite' ? "'Special Elite', monospace" : "'Courier Prime', monospace" }}
                         />
                     </div>
                 </div>
