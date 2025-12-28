@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward, Settings, Monitor, Coffee, Zap, Info, Sun, Moon, CloudRain, Flame } from 'lucide-react';
+import { useDraggable } from './useDraggable'; // Import the hook
+import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward, Settings, Monitor, Coffee, Zap, Info, Sun, Moon, CloudRain, Flame, Stamp } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import './index.css';
 import './music_player.css';
@@ -81,9 +82,13 @@ function App() {
     // --- Global Shortcuts ---
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
-            // Alt + M to reopen Music Player
-            if (e.altKey && (e.key === 'm' || e.key === 'M')) {
-                setShowMusicPlayer(true);
+            if (e.altKey) {
+                // Alt + M: Music Player
+                if (e.key === 'm' || e.key === 'M') setShowMusicPlayer(true);
+                // Alt + P: Pomodoro
+                if (e.key === 'p' || e.key === 'P') setShowPomodoro(prev => !prev);
+                // Alt + W: Word Count
+                if (e.key === 'w' || e.key === 'W') setShowWordCount(prev => !prev);
             }
         };
         window.addEventListener('keydown', handleGlobalKeyDown);
@@ -91,37 +96,10 @@ function App() {
     }, []);
     // ---------------------------
 
-    // --- Draggable Widget Logic ---
-    const [widgetPos, setWidgetPos] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0 });
-    const initialPos = useRef({ x: 0, y: 0 });
-
-    const startDrag = (e: React.MouseEvent) => {
-        setIsDragging(true);
-        dragStart.current = { x: e.clientX, y: e.clientY };
-        initialPos.current = { x: widgetPos.x, y: widgetPos.y };
-    };
-
-    useEffect(() => {
-        const handleDrag = (e: MouseEvent) => {
-            if (!isDragging) return;
-            const dx = e.clientX - dragStart.current.x;
-            const dy = e.clientY - dragStart.current.y;
-            setWidgetPos({ x: initialPos.current.x + dx, y: initialPos.current.y + dy });
-        };
-
-        const stopDrag = () => setIsDragging(false);
-
-        if (isDragging) {
-            window.addEventListener('mousemove', handleDrag);
-            window.addEventListener('mouseup', stopDrag);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleDrag);
-            window.removeEventListener('mouseup', stopDrag);
-        };
-    }, [isDragging]);
+    // --- Draggable State ---
+    const musicDrag = useDraggable({ x: 0, y: 0 });
+    const pomoDrag = useDraggable({ x: 0, y: 0 });
+    const wordDrag = useDraggable({ x: 0, y: 0 });
     // ---------------------------
 
     const [text, setText] = useState<string>('');
@@ -150,9 +128,13 @@ function App() {
     // 3. Pomodoro
     const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
     const [pomodoroActive, setPomodoroActive] = useState(false);
+    const [showPomodoro, setShowPomodoro] = useState(true);
 
     // 4. Stats
     const [wordCount, setWordCount] = useState(0);
+    const [wordGoal, setWordGoal] = useState(500);
+    const [showWordCount, setShowWordCount] = useState(true);
+    const [isEditingGoal, setIsEditingGoal] = useState(false);
 
     // 5. Inspiration
     const [cardFlipped, setCardFlipped] = useState(false);
@@ -320,15 +302,18 @@ function App() {
     // Initialize Ambience Refs on mount
     useEffect(() => {
         if (!ambienceRefs.rain.current) {
-            ambienceRefs.rain.current = new Audio("https://cdn.pixabay.com/download/audio/2022/07/04/audio_3d168527f3.mp3");
+            // "Rain"
+            ambienceRefs.rain.current = new Audio("/sounds/Rain.mp3");
             ambienceRefs.rain.current.loop = true;
         }
         if (!ambienceRefs.fire.current) {
-            ambienceRefs.fire.current = new Audio("https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3");
+            // "Fire"
+            ambienceRefs.fire.current = new Audio("/sounds/Fire.mp3");
             ambienceRefs.fire.current.loop = true;
         }
         if (!ambienceRefs.cafe.current) {
-            ambienceRefs.cafe.current = new Audio("https://cdn.pixabay.com/download/audio/2021/08/09/audio_8ed465b53d.mp3"); // Cafe chatter
+            // "Cafe"
+            ambienceRefs.cafe.current = new Audio("/sounds/Cafe.mp3");
             ambienceRefs.cafe.current.loop = true;
         }
     }, []);
@@ -398,9 +383,26 @@ function App() {
 
         const top = spanRect.top - mirrorRect.top;
         const left = spanRect.left - mirrorRect.left;
-        const adjustedTop = top - textarea.scrollTop;
 
-        caret.style.transform = `translate(${left}px, ${adjustedTop}px)`;
+        // Adjust for scroll
+        // Since container scrolls, we use offsetTop relative to it?
+        // Actually, mirror grows with text. 
+        // We need caret position relative to the scrollable container.
+
+        caret.style.transform = `translate(${left}px, ${top}px)`;
+
+        // Auto-Scroll Logic
+        // If the caret is near the bottom of the visible container (e.g. obscured by typewriter)
+        const container = textarea.parentElement;
+        if (container) {
+            const caretAbsTop = spanRect.top;
+            const containerRect = container.getBoundingClientRect();
+            const bottomThreshold = containerRect.bottom - 200; // 200px buffer for typewriter
+
+            if (caretAbsTop > bottomThreshold) {
+                container.scrollBy({ top: caretAbsTop - bottomThreshold, behavior: 'smooth' });
+            }
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -494,6 +496,40 @@ function App() {
     };
 
     // Implemented Screenshot using html2canvas
+    // Date Stamp Logic
+    const addDateStamp = () => {
+        const now = new Date();
+
+        const day = now.getDate();
+        const month = now.toLocaleString('default', { month: 'long' });
+        const year = now.getFullYear();
+
+        const getOrdinal = (n: number) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return s[(v - 20) % 10] || s[v] || s[0];
+        };
+
+        const stampText = `\n[ ${day}${getOrdinal(day)} ${month} ${year} ]\n`;
+
+        const textarea = textareaRef.current;
+        if (textarea) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const newText = text.substring(0, start) + stampText + text.substring(end);
+            setText(newText);
+
+            // Move cursor after stamp
+            setTimeout(() => {
+                textarea.selectionStart = textarea.selectionEnd = start + stampText.length;
+                textarea.focus();
+            }, 0);
+        } else {
+            setText(prev => prev + stampText);
+        }
+        playSound('enter'); // Use the mechanical zip/thud sound for the stamp action
+    };
+
     // Implemented Screenshot using html2canvas
     const handleScreenshot = async (mode: 'desk' | 'paper') => {
         setScreenshotMenuOpen(false);
@@ -579,21 +615,79 @@ function App() {
             </div>
 
             {/* Sticky Note (Word Count) */}
-            <div className="sticky-note">
-                <div className="sticky-pin"></div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Word Count</div>
-                <div style={{ fontSize: '2.5rem', marginTop: '10px' }}>{wordCount}</div>
-                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Goal: 500</div>
-            </div>
+            {showWordCount && (
+                <div
+                    className="sticky-note"
+                    style={{
+                        transform: `translate(${wordDrag.position.x}px, ${wordDrag.position.y}px) rotate(-2deg)`,
+                        cursor: wordDrag.isDragging ? 'grabbing' : 'grab',
+                        zIndex: 60
+                    }}
+                    onMouseDown={wordDrag.startDrag}
+                >
+                    <button
+                        className="close-widget-btn"
+                        onClick={() => setShowWordCount(false)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={{ top: '5px', right: '5px' }}
+                        title="Close (Alt+W to reopen)"
+                    >
+                        <X size={12} />
+                    </button>
+                    <div className="sticky-pin"></div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Word Count</div>
+                    <div style={{ fontSize: '2.5rem', marginTop: '10px' }}>{wordCount}</div>
+
+                    {isEditingGoal ? (
+                        <input
+                            type="number"
+                            value={wordGoal}
+                            onChange={(e) => setWordGoal(parseInt(e.target.value) || 0)}
+                            onBlur={() => setIsEditingGoal(false)}
+                            onKeyDown={(e) => e.key === 'Enter' && setIsEditingGoal(false)}
+                            autoFocus
+                            style={{ width: '60px', background: 'transparent', border: 'none', borderBottom: '1px solid #444', textAlign: 'center', fontSize: '0.8rem' }}
+                        />
+                    ) : (
+                        <div
+                            style={{ fontSize: '0.8rem', opacity: 0.7, cursor: 'pointer' }}
+                            onClick={(e) => { e.stopPropagation(); setIsEditingGoal(true); }}
+                            title="Click to edit goal"
+                        >
+                            Goal: {wordGoal}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Pomodoro Timer */}
-            <div className="pomodoro-widget" onClick={() => setPomodoroActive(!pomodoroActive)} title="Click to Start/Pause">
-                <div className="timer-face">
-                    {Math.floor(pomodoroTime / 60)}:{(pomodoroTime % 60).toString().padStart(2, '0')}
+            {showPomodoro && (
+                <div
+                    className="pomodoro-widget"
+                    title="Click face to Start/Pause"
+                    style={{
+                        transform: `translate(${pomoDrag.position.x}px, ${pomoDrag.position.y}px)`,
+                        cursor: pomoDrag.isDragging ? 'grabbing' : 'grab',
+                        zIndex: 60
+                    }}
+                    onMouseDown={pomoDrag.startDrag}
+                >
+                    <button
+                        className="close-widget-btn"
+                        onClick={() => setShowPomodoro(false)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={{ top: '0px', right: '0px', transform: 'translate(30%, -30%)' }}
+                        title="Close (Alt+P to reopen)"
+                    >
+                        <X size={12} />
+                    </button>
+                    <div className="timer-face" onClick={(e) => { e.stopPropagation(); setPomodoroActive(!pomodoroActive); }} style={{ cursor: 'pointer' }}>
+                        {Math.floor(pomodoroTime / 60)}:{(pomodoroTime % 60).toString().padStart(2, '0')}
+                    </div>
+                    <div className="timer-progress" style={{ transform: `rotate(${((25 * 60 - pomodoroTime) / (25 * 60)) * 360}deg)` }}></div>
+                    <div className="timer-label">{pomodoroActive ? "Running" : "Paused"}</div>
                 </div>
-                <div className="timer-progress" style={{ transform: `rotate(${((25 * 60 - pomodoroTime) / (25 * 60)) * 360}deg)` }}></div>
-                <div className="timer-label">{pomodoroActive ? "Running" : "Paused"}</div>
-            </div>
+            )}
 
             {/* Inspiration Deck */}
             <div className={`inspiration-deck ${cardFlipped ? 'flipped' : ''}`} onClick={() => {
@@ -686,6 +780,9 @@ function App() {
                         </button>
                         <button onClick={handleDownload} title="Download">
                             <Download size={20} />
+                        </button>
+                        <button onClick={addDateStamp} title="Stamp Date">
+                            <Stamp size={20} />
                         </button>
                         <div style={{ position: 'relative', display: 'inline-block' }}>
                             <button onClick={() => setScreenshotMenuOpen(!screenshotMenuOpen)} title="Snapshot Options">
@@ -875,10 +972,10 @@ function App() {
                     <div
                         className="music-player"
                         style={{
-                            transform: `translate(${widgetPos.x}px, ${widgetPos.y}px)`,
-                            cursor: isDragging ? 'grabbing' : 'grab'
+                            transform: `translate(${musicDrag.position.x}px, ${musicDrag.position.y}px)`,
+                            cursor: musicDrag.isDragging ? 'grabbing' : 'grab'
                         }}
-                        onMouseDown={startDrag}
+                        onMouseDown={musicDrag.startDrag}
                     >
                         <button
                             className="close-widget-btn"
