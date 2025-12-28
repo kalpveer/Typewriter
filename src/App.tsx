@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDraggable } from './useDraggable'; // Import the hook
-import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward, Settings, Monitor, Coffee, Zap, Info, Sun, Moon, CloudRain, Flame, Stamp } from 'lucide-react';
+import { Save, FilePlus, Download, Volume2, VolumeX, Camera, FolderOpen, X, Trash2, Play, Pause, SkipBack, SkipForward, Settings, Coffee, CloudRain, Flame, Stamp } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import './index.css';
 import './music_player.css';
