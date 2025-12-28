@@ -427,6 +427,10 @@ function App() {
                     scale: 2, // Retina quality
                     useCORS: true,
                     backgroundColor: null,
+                    scrollX: 0,
+                    scrollY: 0,
+                    width: element.offsetWidth,
+                    height: element.offsetHeight
                 });
 
                 const link = document.createElement('a');
@@ -565,7 +569,7 @@ function App() {
 
                         {/* Brand */}
                         <rect x="350" y="140" width="100" height="30" fill="#111" stroke="#333" />
-                        <text x="400" y="160" textAnchor="middle" fill="#d4af37" fontFamily="monospace" fontSize="16" letterSpacing="2">KALP</text>
+                        <text x="400" y="160" textAnchor="middle" fill="#d4af37" fontFamily="monospace" fontSize="16" letterSpacing="2">TYPO</text>
 
                         {/* Keys */}
                         <g transform="translate(140, 200)">
