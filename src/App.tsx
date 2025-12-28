@@ -28,11 +28,18 @@ function App() {
     const [volume, setVolume] = useState(0.5);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    // Using reliable direct MP3 links to simulate the desired "Chill Electronic" vibe
+    // Playlist with simulated separate tracks using long mixes + short loops
     const PLAYLIST = [
-        { title: "Chill Lofi Study", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" },
+        { title: "Tokyo Vibes", src: "https://radioweblatina.com/playlist/music/lofi/80_'s%20Tokyo%20Vibes%20-%20Lofi%20hiphop%20mix%201H31m.mp3" },
+        { title: "Lofi Study", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" },
+        { title: "City Girl", src: "https://radioweblatina.com/playlist/music/lofi/80s%20Tokyo%20City%20Girl%20-%20%201hour%20Lofi%20hiphop%20mix%201H.mp3" },
         { title: "Night Rain", src: "https://cdn.pixabay.com/download/audio/2022/02/22/audio_d1718ab41b.mp3?filename=rainy-day-110825.mp3" },
-        { title: "Deep Urban", src: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=salty-swing-11354.mp3" } // Re-using Jazz as 'Deep Urban' placeholder for now or finding better if possible, but keeping it simple to ensure playback works.
+        { title: "Lonely Night", src: "https://radioweblatina.com/playlist/music/lofi/80s%20Tokyo%20Lonely%20Night%20-%20Lofi%20hiphop%20mix%20-%20Chill%20%20Study%201H31m.mp3" },
+        { title: "Vintage Jazz", src: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=salty-swing-11354.mp3" },
+        { title: "Tokyo Chill", src: "https://radioweblatina.com/playlist/music/lofi/1980_'s%20lo-fi%20chill%20music%20-%201hour%20Lofi%20hiphop%20mix%201H.mp3" },
+        { title: "Distant Memory", src: "https://radioweblatina.com/playlist/music/lofi/OLD%20Tokyo%20Distant%20Memory%20%20-%20Lofi%20hiphop%20mix%201H.mp3" },
+        { title: "Lazy Night", src: "https://radioweblatina.com/playlist/music/lofi/Tokyo%20Lazy%20Night%20-%201hour%20Lofi%20hiphop%20mix%20-%20chill%20beats%201H.mp3" },
+        { title: "Midnight Vibes", src: "https://radioweblatina.com/playlist/music/lofi/80s%20Tokyo%20Night%20Lofi%20Chill%20Hiphop%20%20-%20Lofi%20hiphop%20mix%201H22m%20.mp3" }
     ];
 
     useEffect(() => {
